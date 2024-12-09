@@ -22,23 +22,25 @@ const recordExpenses = async (expenses) => {
 };
 
 program
-  .command("add <title> [description]")
-  .description("Add a new expense")
-  .action(async (title, description) => {
+  .command("add <name> <amount> [category]")
+  .description("Add a new expense, name and amount are required")
+  .action(async (name, amount, category) => {
     const expenses = await getExpenses();
-    const existingExpense = expenses.find((expense) => expense.title === title);
+    const existingExpense = expenses.find((expense) => expense.name === name);
     if (existingExpense) {
-      console.warn(`Expenses title should be unique: ${title}`);
+      console.warn(`Expenses name should be unique: ${name}`);
       return;
     }
     const newExpense = {
       ID: expenses.length ? expenses[expenses.length - 1].id + 1 : 1,
-      title,
-      description: description || "",
-      category: "pending",
+      name,
+      amount: `$${amount}`,
+      category: category || "",
       created: new Date(),
     };
     expenses.push(newExpense);
     await recordExpenses(expenses);
-    console.log("Expense added:", newExpense.ID);
+    console.log("Expense added:", newExpense);
   });
+
+program.parse(process.argv);
