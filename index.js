@@ -21,6 +21,7 @@ const recordExpenses = async (expenses) => {
   }
 };
 
+// Add Expense
 program
   .command("add <name> <amount> [category]")
   .description("Add a new expense, name and amount are required")
@@ -32,7 +33,7 @@ program
       return;
     }
     const newExpense = {
-      ID: expenses.length ? expenses[expenses.length - 1].id + 1 : 1,
+      id: expenses.length ? expenses[expenses.length - 1].id + 1 : 1,
       name,
       amount: `$${amount}`,
       category: category || "",
@@ -41,6 +42,39 @@ program
     expenses.push(newExpense);
     await recordExpenses(expenses);
     console.log("Expense added:", newExpense);
+  });
+
+// Update Expense
+program
+  .command("update <id>")
+  .description("Updates existing expense")
+  .option("--n <name>", "edit name")
+  .option("--a <amount>", "edit amount")
+  .option("--c <category>", "edit category")
+  .action(async (id, options) => {
+    const expenses = await getExpenses();
+    const existingExpenseIndex = expenses.findIndex(
+      (expense) => expense.id === parseInt(id)
+    );
+    if (!!existingExpenseIndex) {
+      console.warn(`Could not find expense with: ${id}`);
+      return;
+    }
+    const flagOptions = {
+      n: "name",
+      a: "amount",
+      c: "category",
+    };
+    Object.entries(flagOptions).forEach(([key, prop]) => {
+      if (options[key]) {
+        expenses[existingExpenseIndex][prop] =
+          key === "a" ? `$${options[key]}` : options[key];
+      }
+      expenses[existingExpenseIndex].updated = new Date();
+    });
+
+    await recordExpenses(expenses);
+    console.log("Expense updated:", expenses[existingExpenseIndex]);
   });
 
 program.parse(process.argv);
