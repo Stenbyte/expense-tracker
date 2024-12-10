@@ -77,4 +77,26 @@ program
     console.log("Expense updated:", expenses[existingExpenseIndex]);
   });
 
+// Delete
+program
+  .command("delete <id>")
+  .description("Deletes existing expense")
+  .action(async (id) => {
+    const expenses = await getExpenses();
+
+    const existingExpense = expenses.some(
+      (expense) => expense.id === parseInt(id)
+    );
+    if (!existingExpense) {
+      console.log(`Could not find expense with id: ${id}`);
+      return;
+    }
+
+    const filteredExpenses = expenses.filter(
+      (expense) => expense.id === parseInt(id)
+    );
+    await recordExpenses(filteredExpenses);
+    console.log(`Expense deleted with id: ${id}`);
+  });
+
 program.parse(process.argv);
