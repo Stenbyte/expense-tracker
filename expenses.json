@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "name": "lunch",
+    "amount": "$20",
+    "category": "food",
+    "created": "2024-12-10T10:20:54.427Z"
+  },
+  {
+    "id": 2,
+    "name": "car",
+    "amount": "$40",
+    "category": "detailing",
+    "created": "2024-06-10T10:38:10.146Z"
+  },
+  {
+    "id": 3,
+    "name": "car was2h",
+    "amount": "$20",
+    "category": "concert",
+    "created": "2024-07-10T10:38:53.933Z"
+  },
+  {
+    "id": 4,
+    "name": "ticket",
+    "amount": "$100",
+    "category": "concert",
+    "created": "2023-12-10T10:38:53.933Z"
+  }
+]

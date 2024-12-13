@@ -1,6 +1,7 @@
 const { program } = require("commander");
 const fs = require("fs-extra");
 const path = require("path");
+const { processListOptions } = require("./helperFunctions");
 
 const EXPENSES_FILE = path.join(__dirname, "expenses.json");
 
@@ -106,72 +107,14 @@ program
   .option("--all", "view all expenses")
   .option("--summary", "summary  of all expenses")
   .option("--month <month>", "summary  of all expenses for given month (1-12)")
+  .option("--category <category>", "summary by category")
   .option(
     "--year <year>",
     "summary  of all expenses for given year. Default, current year"
   )
   .action(async (options) => {
     const expenses = await getExpenses();
-    processOptions(expenses, options);
+    processListOptions(expenses, options);
   });
 
 program.parse(process.argv);
-
-const processOptions = (expenses, options) => {
-  const actions = {
-    summary: () => handleSummary(expenses),
-    all: () => handleAll(expenses),
-    month: () => handleByMonth(expenses, options),
-  };
-
-  Object.keys(actions).forEach((key) => {
-    if (options[key]) {
-      actions[key]();
-    }
-  });
-};
-
-const handleSummary = (expenses) => {
-  let summary = 0;
-  expenses.forEach((expense) => {
-    let amount = Number(expense.amount.slice(1));
-    summary = summary + amount;
-  });
-  console.log(summary, "Summary");
-};
-
-const handleAll = (expenses) => {
-  console.table(expenses);
-};
-
-const handleByMonth = (expenses, options) => {
-  const month = parseInt(options.month);
-  const year = options.year ? parseInt(options.year) : new Date().getFullYear();
-
-  if (!month || month < 1 || month > 12) {
-    console.error("+++++Please provide a valid month (1-12).+++++++");
-    return;
-  }
-
-  const totalAmount = summarizeExpensensesByMonth(expenses, month - 1, year);
-
-  console.log(`Expenses for given ${month} ${totalAmount} in a year ${year}`);
-};
-
-function summarizeExpensensesByMonth(expenses, targetMonth, targetYear) {
-  const filteredExpensesByMonthAndYear = expenses.filter((expense) => {
-    const createdDate = new Date(expense.created);
-
-    const yy = createdDate.getMonth();
-    return (
-      createdDate.getMonth() === targetMonth &&
-      createdDate.getFullYear() === targetYear
-    );
-  });
-
-  const totalAmount = filteredExpensesByMonthAndYear.reduce((sum, expense) => {
-    return sum + (Number(expense.amount.slice(1)) || 0);
-  }, 0);
-
-  return totalAmount;
-}
