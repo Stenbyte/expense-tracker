@@ -3,7 +3,7 @@ import path from "path";
 
 const EXPENSES_FILE = path.join("expenses.json");
 
-export const processListOptions = async (command, options) => {
+export const processCommand = async (command, options) => {
   const expenses = await getExpenses();
   const listActions = {
     summary: () => handleSummary(expenses),
@@ -14,11 +14,32 @@ export const processListOptions = async (command, options) => {
 
   const actionsList = {
     list: listActions,
+    add: { addNewExpense },
+    update: { updateExpense },
+    delete: { deleteExpense },
   };
 
   Object.keys(actionsList[command]).forEach((actionKey) => {
-    if (options[actionKey]) {
-      actionsList[command][actionKey]();
+    switch (command) {
+      case "list":
+        if (options[actionKey]) {
+          actionsList[command][actionKey]();
+        }
+        break;
+      case "add":
+        actionsList[command][actionKey](
+          expenses,
+          options.name,
+          options.amount,
+          options.category
+        );
+        break;
+      case "update":
+        actionsList[command][actionKey](expenses, options.id, options.options);
+        break;
+      case "delete":
+        actionsList[command][actionKey](expenses, options.id);
+        break;
     }
   });
 };
@@ -54,7 +75,6 @@ function summarizeExpensensesByMonth(expenses, targetMonth, targetYear) {
   const filteredExpensesByMonthAndYear = expenses.filter((expense) => {
     const createdDate = new Date(expense.created);
 
-    const yy = createdDate.getMonth();
     return (
       createdDate.getMonth() === targetMonth &&
       createdDate.getFullYear() === targetYear
@@ -92,8 +112,7 @@ export async function recordExpenses(expenses) {
   }
 }
 
-export async function addNewExpense(name, amount, category) {
-  const expenses = await getExpenses();
+export async function addNewExpense(expenses, name, amount, category) {
   const existingExpense = expenses.find((expense) => expense.name === name);
   if (existingExpense) {
     console.warn(`Expenses name should be unique: ${name}`);
@@ -111,13 +130,12 @@ export async function addNewExpense(name, amount, category) {
   console.log("Expense added:", newExpense);
 }
 
-export async function updateExpense(id, options) {
-  const expenses = await getExpenses();
+export async function updateExpense(expenses, id, options) {
   const existingExpenseIndex = expenses.findIndex(
     (expense) => expense.id === parseInt(id)
   );
-  if (!!existingExpenseIndex) {
-    console.warn(`Could not find expense with: ${id}`);
+  if (existingExpenseIndex === -1) {
+    console.warn(`Could not find expense with id: ${id}`);
     return;
   }
   const flagOptions = {
@@ -135,4 +153,20 @@ export async function updateExpense(id, options) {
 
   await recordExpenses(expenses);
   console.log("Expense updated:", expenses[existingExpenseIndex]);
+}
+
+async function deleteExpense(expenses, id) {
+  const existingExpense = expenses.some(
+    (expense) => expense.id === parseInt(id)
+  );
+  if (!existingExpense) {
+    console.log(`Could not find expense with id: ${id}`);
+    return;
+  }
+
+  const filteredExpenses = expenses.filter(
+    (expense) => expense.id !== parseInt(id)
+  );
+  await recordExpenses(filteredExpenses);
+  console.log(`Expense deleted with id: ${id}`);
 }
