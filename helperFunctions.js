@@ -2,9 +2,11 @@ import fs from "fs-extra";
 import path from "path";
 
 const EXPENSES_FILE = path.join("expenses.json");
+const BUDGET_FILE = path.join("budget.json");
 
 export const processCommand = async (command, options) => {
-  const expenses = await getExpenses();
+  const expenses = await getData();
+  const budget = await getData(true);
   const listActions = {
     summary: () => handleSummary(expenses),
     all: () => handleAll(expenses),
@@ -17,6 +19,7 @@ export const processCommand = async (command, options) => {
     add: { addNewExpense },
     update: { updateExpense },
     delete: { deleteExpense },
+    budget: { setBudget },
   };
 
   Object.keys(actionsList[command]).forEach((actionKey) => {
@@ -31,7 +34,8 @@ export const processCommand = async (command, options) => {
           expenses,
           options.name,
           options.amount,
-          options.category
+          options.category,
+          budget
         );
         break;
       case "update":
@@ -39,6 +43,9 @@ export const processCommand = async (command, options) => {
         break;
       case "delete":
         actionsList[command][actionKey](expenses, options.id);
+        break;
+      case "budget":
+        actionsList[command][actionKey](options.month, options.amount, budget);
         break;
     }
   });
@@ -95,38 +102,62 @@ function handleByCategory(expenses, options) {
   console.table(filteredByCategory);
 }
 
-export async function getExpenses() {
+export async function getData(getBudget) {
   try {
-    return await fs.readJSON(EXPENSES_FILE);
+    return await fs.readJSON(getBudget ? BUDGET_FILE : EXPENSES_FILE);
   } catch {
     return [];
   }
 }
 
-export async function recordExpenses(expenses) {
-  if (EXPENSES_FILE) {
-    await fs.writeJSON(EXPENSES_FILE, expenses, { spaces: 2 });
+export async function recordData(dataToRecord, setBudget) {
+  if (EXPENSES_FILE || BUDGET_FILE) {
+    await fs.writeJSON(setBudget ? BUDGET_FILE : EXPENSES_FILE, dataToRecord, {
+      spaces: 2,
+    });
   } else {
-    const FILE = path.join(__dirname, "expenses.json");
-    await fs.writeJSON(FILE, expenses, { spaces: 2 });
+    const FILE = path.join(
+      __dirname,
+      setBudget ? "budget.json" : "expenses.json"
+    );
+    await fs.writeJSON(FILE, dataToRecord, { spaces: 2 });
   }
 }
 
-export async function addNewExpense(expenses, name, amount, category) {
+export async function addNewExpense(expenses, name, amount, category, budget) {
   const existingExpense = expenses.find((expense) => expense.name === name);
   if (existingExpense) {
     console.warn(`Expenses name should be unique: ${name}`);
     return;
   }
+  const created = new Date();
+  const getMonth = created.getMonth();
+
+  const getBudgetForCurrentMonth = budget.find((b) => b[getMonth + 1]);
+  const getBudgetForYear = budget.find((b) => b["year"]);
+
+  if (
+    (getBudgetForCurrentMonth &&
+      getBudgetForCurrentMonth[getMonth + 1] < Number(amount)) ||
+    (getBudgetForYear && getBudgetForYear["year"] < Number(amount))
+  ) {
+    console.log(
+      `Amount is too big, you have exeeded your limit. Please check your ${
+        getBudgetForCurrentMonth ? getMonth + 1 + " month" : "year"
+      } budget`
+    );
+    return;
+  }
+
   const newExpense = {
     id: expenses.length ? expenses[expenses.length - 1].id + 1 : 1,
     name,
     amount: `$${amount}`,
     category: category || "",
-    created: new Date(),
+    created,
   };
   expenses.push(newExpense);
-  await recordExpenses(expenses);
+  await recordData(expenses);
   console.log("Expense added:", newExpense);
 }
 
@@ -151,7 +182,7 @@ export async function updateExpense(expenses, id, options) {
     expenses[existingExpenseIndex].updated = new Date();
   });
 
-  await recordExpenses(expenses);
+  await recordData(expenses);
   console.log("Expense updated:", expenses[existingExpenseIndex]);
 }
 
@@ -167,6 +198,23 @@ async function deleteExpense(expenses, id) {
   const filteredExpenses = expenses.filter(
     (expense) => expense.id !== parseInt(id)
   );
-  await recordExpenses(filteredExpenses);
+  await recordData(filteredExpenses);
   console.log(`Expense deleted with id: ${id}`);
+}
+
+async function setBudget(month, amount, budgetList) {
+  const budget = {};
+  if ((month && !Number(month)) || (amount && !Number(amount))) {
+    console.log("Options must be type of number");
+    return;
+  }
+  budget[month ? month : "year"] = Number(amount);
+
+  // i need to check if current budget month year exist and update amount
+  budgetList[month ? month : "year"] = { year: amount };
+
+  await recordData(budgetList, true);
+  console.log(
+    `Budget has been set for ${month ? month : "year"}. Amount: ${amount}`
+  );
 }
