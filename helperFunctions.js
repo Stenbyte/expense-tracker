@@ -204,14 +204,23 @@ async function deleteExpense(expenses, id) {
 
 async function setBudget(month, amount, budgetList) {
   const budget = {};
+  const monthOrYearBudget = month ? month : "year";
+
   if ((month && !Number(month)) || (amount && !Number(amount))) {
     console.log("Options must be type of number");
     return;
   }
-  budget[month ? month : "year"] = Number(amount);
 
-  // i need to check if current budget month year exist and update amount
-  budgetList[month ? month : "year"] = { year: amount };
+  const existisInBudget = budgetList.findIndex(
+    (budget) => budget[monthOrYearBudget]
+  );
+  if (existisInBudget !== -1) {
+    budgetList[existisInBudget][monthOrYearBudget] = Number(amount);
+  } else {
+    budget[monthOrYearBudget] = Number(amount);
+
+    budgetList.push(budget);
+  }
 
   await recordData(budgetList, true);
   console.log(
