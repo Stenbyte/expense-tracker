@@ -1,3 +1,4 @@
+import { create } from "domain";
 import fs from "fs-extra";
 import path from "path";
 
@@ -42,7 +43,7 @@ export const processCommand = async (command, options) => {
         actionsList[command][actionKey](expenses, options.id, options.options);
         break;
       case "delete":
-        actionsList[command][actionKey](expenses, options.id);
+        actionsList[command][actionKey](expenses, options.id, budget);
         break;
       case "budget":
         actionsList[command][actionKey](options.month, options.amount, budget);
@@ -186,7 +187,7 @@ export async function updateExpense(expenses, id, options) {
   console.log("Expense updated:", expenses[existingExpenseIndex]);
 }
 
-async function deleteExpense(expenses, id) {
+async function deleteExpense(expenses, id, budgetList) {
   const existingExpense = expenses.some(
     (expense) => expense.id === parseInt(id)
   );
@@ -198,7 +199,14 @@ async function deleteExpense(expenses, id) {
   const filteredExpenses = expenses.filter(
     (expense) => expense.id !== parseInt(id)
   );
-  await recordData(filteredExpenses);
+
+  recalculateBudget(expenses, budgetList, id);
+
+  await Promise.all([
+    recordData(filteredExpenses),
+    recordData(budgetList, true),
+  ]);
+
   console.log(`Expense deleted with id: ${id}`);
 }
 
@@ -226,4 +234,21 @@ async function setBudget(month, amount, budgetList) {
   console.log(
     `Budget has been set for ${month ? month : "year"}. Amount: ${amount}`
   );
+}
+
+function recalculateBudget(expenses, budgetList, id) {
+  const getExpense = expenses.find((expense) => expense.id === Number(id));
+
+  const getMonth = new Date(getExpense.created).getMonth() + 1;
+
+  Object.entries(budgetList).forEach(([key, value]) => {
+    if (budgetList[key][getMonth]) {
+      budgetList[key][getMonth] =
+        budgetList[key][getMonth] - getExpense.amount.slice(1);
+    }
+    if (budgetList[key]["year"]) {
+      budgetList[key]["year"] =
+        budgetList[key]["year"] - getExpense.amount.slice(1);
+    }
+  });
 }
