@@ -45,4 +45,17 @@ program
     processCommand("list", options);
   });
 
+// Set budget
+program
+  .command("budget")
+  .description("Set budget for each month and show warning when exeeds")
+  .option("--amount <amount>", "set common budget")
+  .option("--month <month>", "set for specific month")
+  .action(async (options) => {
+    processCommand("budget", options);
+  });
+
 program.parse(process.argv);
+
+// allow user to set budget for each month and warning when exeeds the budget
+// allow users to export expenses and budget in csv file
