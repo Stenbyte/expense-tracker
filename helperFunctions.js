@@ -40,7 +40,12 @@ export const processCommand = async (command, options) => {
         );
         break;
       case "update":
-        actionsList[command][actionKey](expenses, options.id, options.options);
+        actionsList[command][actionKey](
+          expenses,
+          options.id,
+          options.options,
+          budget
+        );
         break;
       case "delete":
         actionsList[command][actionKey](expenses, options.id, budget);
@@ -132,23 +137,7 @@ export async function addNewExpense(expenses, name, amount, category, budget) {
     return;
   }
   const created = new Date();
-  const getMonth = created.getMonth();
-
-  const getBudgetForCurrentMonth = budget.find((b) => b[getMonth + 1]);
-  const getBudgetForYear = budget.find((b) => b["year"]);
-
-  if (
-    (getBudgetForCurrentMonth &&
-      getBudgetForCurrentMonth[getMonth + 1] < Number(amount)) ||
-    (getBudgetForYear && getBudgetForYear["year"] < Number(amount))
-  ) {
-    console.log(
-      `Amount is too big, you have exeeded your limit. Please check your ${
-        getBudgetForCurrentMonth ? getMonth + 1 + " month" : "year"
-      } budget`
-    );
-    return;
-  }
+  const getMonth = created.getMonth() + 1;
 
   const newExpense = {
     id: expenses.length ? expenses[expenses.length - 1].id + 1 : 1,
@@ -158,11 +147,14 @@ export async function addNewExpense(expenses, name, amount, category, budget) {
     created,
   };
   expenses.push(newExpense);
-  await recordData(expenses);
+  recalculateBudget(expenses, budget, newExpense.id);
+
+  await Promise.all([recordData(expenses), recordData(budget, true)]);
+
   console.log("Expense added:", newExpense);
 }
 
-export async function updateExpense(expenses, id, options) {
+export async function updateExpense(expenses, id, options, budgetList) {
   const existingExpenseIndex = expenses.findIndex(
     (expense) => expense.id === parseInt(id)
   );
@@ -182,8 +174,9 @@ export async function updateExpense(expenses, id, options) {
     }
     expenses[existingExpenseIndex].updated = new Date();
   });
+  recalculateBudget(expenses, budgetList, id);
 
-  await recordData(expenses);
+  await Promise.all([recordData(expenses), recordData(budgetList, true)]);
   console.log("Expense updated:", expenses[existingExpenseIndex]);
 }
 
@@ -211,28 +204,22 @@ async function deleteExpense(expenses, id, budgetList) {
 }
 
 async function setBudget(month, amount, budgetList) {
-  const budget = {};
-  const monthOrYearBudget = month ? month : "year";
-
   if ((month && !Number(month)) || (amount && !Number(amount))) {
     console.log("Options must be type of number");
     return;
   }
+  const budgetKey = month ? month.toString() : "year";
+  if (!budgetList.length) budgetList.push({});
 
-  const existisInBudget = budgetList.findIndex(
-    (budget) => budget[monthOrYearBudget]
-  );
-  if (existisInBudget !== -1) {
-    budgetList[existisInBudget][monthOrYearBudget] = Number(amount);
-  } else {
-    budget[monthOrYearBudget] = Number(amount);
+  const budget = budgetList[0];
 
-    budgetList.push(budget);
-  }
+  budget[budgetKey] = Number(amount);
 
   await recordData(budgetList, true);
   console.log(
-    `Budget has been set for ${month ? month : "year"}. Amount: ${amount}`
+    `Budget has been successfully set for ${
+      month ? `month ${month}` : "the year"
+    }. Amount: ${amount}`
   );
 }
 
@@ -240,15 +227,25 @@ function recalculateBudget(expenses, budgetList, id) {
   const getExpense = expenses.find((expense) => expense.id === Number(id));
 
   const getMonth = new Date(getExpense.created).getMonth() + 1;
+  const expenseAmount = parseFloat(getExpense.amount.slice(1));
 
-  Object.entries(budgetList).forEach(([key, value]) => {
-    if (budgetList[key][getMonth]) {
-      budgetList[key][getMonth] =
-        budgetList[key][getMonth] - getExpense.amount.slice(1);
+  budgetList.forEach((budget) => {
+    if (budget[getMonth] !== undefined) {
+      if (budget[getMonth] < expenseAmount) {
+        throw new Error(
+          `Monthly budget for month ${getMonth} would go below zero.`
+        );
+      }
+      budget[getMonth] -= expenseAmount;
     }
-    if (budgetList[key]["year"]) {
-      budgetList[key]["year"] =
-        budgetList[key]["year"] - getExpense.amount.slice(1);
+
+    if (budget.year !== undefined) {
+      if (budget.year < expenseAmount) {
+        throw new Error(`Yearly budget would go below zero.`);
+      }
+      budget.year -= expenseAmount;
     }
   });
+
+  console.log("Budget recalculated successfully:", budgetList);
 }
