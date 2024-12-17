@@ -55,7 +55,12 @@ program
     processCommand("budget", options);
   });
 
-program.parse(process.argv);
+// Create report
+program
+  .command("report")
+  .description("Creates report file in csv format")
+  .action(async () => {
+    processCommand("report");
+  });
 
-// allow user to set budget for each month and warning when exeeds the budget
-// allow users to export expenses and budget in csv file
+program.parse(process.argv);

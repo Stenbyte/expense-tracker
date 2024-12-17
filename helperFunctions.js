@@ -1,6 +1,6 @@
-import { create } from "domain";
 import fs from "fs-extra";
 import path from "path";
+import { Parser } from "json2csv";
 
 const EXPENSES_FILE = path.join("expenses.json");
 const BUDGET_FILE = path.join("budget.json");
@@ -21,6 +21,7 @@ export const processCommand = async (command, options) => {
     update: { updateExpense },
     delete: { deleteExpense },
     budget: { setBudget },
+    report: { createReport },
   };
 
   Object.keys(actionsList[command]).forEach((actionKey) => {
@@ -52,6 +53,9 @@ export const processCommand = async (command, options) => {
         break;
       case "budget":
         actionsList[command][actionKey](options.month, options.amount, budget);
+        break;
+      case "report":
+        actionsList[command][actionKey](expenses, budget);
         break;
     }
   });
@@ -248,4 +252,45 @@ function recalculateBudget(expenses, budgetList, id) {
   });
 
   console.log("Budget recalculated successfully:", budgetList);
+}
+
+function createReport(expenses, budgetList) {
+  try {
+    const budget = budgetList[0] || {};
+    const combinedData = expenses.map((expense) => {
+      const expenseMonth = new Date(expense.created).getMonth() + 1;
+
+      const monthlyBudget = budget[expenseMonth] || "N/A";
+
+      return {
+        id: expense.id,
+        name: expense.name,
+        amount: expense.amount,
+        category: expense.category || "",
+        date: expense.created || {},
+        "monthly Budget": monthlyBudget,
+      };
+    });
+    const yearBudget = budget["year"] || "N/A";
+    combinedData.push({
+      id: "",
+      name: "",
+      amount: "",
+      category: "",
+      date: "",
+      "monthly Budget": "",
+      "year budget": yearBudget,
+    });
+    const json3csvParser = new Parser();
+
+    const csvFile = json3csvParser.parse(combinedData);
+
+    const filePath = path.join("report.csv");
+
+    fs.writeFile(filePath, csvFile);
+
+    console.log(`Csv export successful. File saved as: ${csvFile}`);
+  } catch (error) {
+    console.log("An error occured while exporting to Csv:", error.message);
+  }
 }
